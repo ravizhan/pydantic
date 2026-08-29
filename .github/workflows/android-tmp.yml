@@ -60,9 +60,11 @@ jobs:
       matrix:
         include:
           - target: x86_64-linux-android
+            android-platform: android_24_x86_64
             python-version: '3.14'
             test: true
           - target: aarch64-linux-android
+            android-platform: android_24_arm64_v8a
             python-version: '3.14'
             test: false
     steps:
@@ -87,12 +89,14 @@ jobs:
       - name: Install wheel for Android
         run: |
           set -eux
+          echo "Android platform: ${{ matrix.android-platform }}"
           python3 -m pip install \
             --only-binary=:all: \
-            --platform "$(python3 -c 'import sysconfig; print(sysconfig.get_platform())')" \
+            --platform '${{ matrix.android-platform }}' \
             --target site-packages \
             dist/*.whl \
             typing-extensions
+
 
       - name: Run tests on Android emulator
         if: matrix.test
