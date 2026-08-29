@@ -404,6 +404,7 @@ jobs:
             --site-packages site-packages \
             --cwd test-cwd \
             -v \
+            -- \
             -c 'import pydantic_core; from pydantic_core import SchemaValidator; v = SchemaValidator({"type": "int"}); assert v.validate_python("42") == 42; from pydantic_core._pydantic_core import build_info; print(f"{build_info=}"); print("pydantic-core Android wheel OK")'
 
   core-bench:
