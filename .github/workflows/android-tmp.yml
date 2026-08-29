@@ -78,6 +78,12 @@ jobs:
           name: pydantic_core_pypi_files_android_${{ matrix.target }}
           path: dist
 
+      # The built wheel targets the Python version used for the Android build
+      # (cp${{ matrix.python-version }}); install it so pip resolves the wheel's tags.
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '${{ matrix.python-version }}'
+
       - name: Download Android Python
         run: |
           set -eux
