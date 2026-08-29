@@ -1018,7 +1018,7 @@ jobs:
     if: always()
     outputs:
       result: ${{ steps.all-green.outputs.result }}
-    needs: [lint, docs-build, test, test-memray, test-mypy, test-plugin, core-test-os, core-test-debug, core-build-pyemscripten]
+    needs: [lint, docs-build, test, test-memray, test-mypy, test-plugin, core-test-os, core-test-debug, core-build-pyemscripten, core-build-android, core-test-builds-android]
     runs-on: ubuntu-latest
 
     steps:
