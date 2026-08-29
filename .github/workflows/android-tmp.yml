@@ -1,0 +1,107 @@
+name: Android (temporary verification)
+
+# TEMPORARY workflow used to verify Android wheel builds on the runner.
+# This file is removed once Android support is confirmed working.
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  core-build-android:
+    name: core / Build Android (${{ matrix.target }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [aarch64-linux-android, x86_64-linux-android]
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          python-version: '3.14'
+          enable-cache: false
+
+      - run: uv sync --only-group build
+
+      - name: Build wheels
+        uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b # v1.51.0
+        with:
+          working-directory: pydantic-core
+          target: ${{ matrix.target }}
+          manylinux: off
+          args: --release --out dist
+          rust-toolchain: stable
+
+      - run: ls -lh dist/
+        working-directory: pydantic-core
+
+      - run: uv run --no-sync twine check --strict pydantic-core/dist/*
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: pydantic_core_pypi_files_android_${{ matrix.target }}
+          path: pydantic-core/dist
+
+  core-test-builds-android:
+    name: core / Test Android build (${{ matrix.target }})
+    needs: [core-build-android]
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-linux-android
+            python-version: '3.14'
+            test: true
+          - target: aarch64-linux-android
+            python-version: '3.14'
+            test: false
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: get dist artifacts
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: pydantic_core_pypi_files_android_${{ matrix.target }}
+          path: dist
+
+      - name: Download Android Python
+        run: |
+          set -eux
+          url="https://www.python.org/ftp/python/${{ matrix.python-version }}.0/python-${{ matrix.python-version }}.0-${{ matrix.target }}.tar.gz"
+          curl -sSfL "$url" -o /tmp/android-python.tar.gz
+          mkdir -p /tmp/android-python
+          tar -xzf /tmp/android-python.tar.gz -C /tmp/android-python
+
+      - name: Install wheel for Android
+        run: |
+          set -eux
+          python3 -m pip install \
+            --only-binary=:all: \
+            --platform "$(python3 -c 'import sysconfig; print(sysconfig.get_platform())')" \
+            --target site-packages \
+            dist/*.whl \
+            typing-extensions
+
+      - name: Run tests on Android emulator
+        if: matrix.test
+        run: |
+          set -eux
+          mkdir -p test-cwd
+          python3 /tmp/android-python/android.py test \
+            --managed maxVersion \
+            --site-packages site-packages \
+            --cwd test-cwd \
+            -v \
+            -c 'import pydantic_core; from pydantic_core import SchemaValidator; v = SchemaValidator({"type": "int"}); assert v.validate_python("42") == 42; from pydantic_core._pydantic_core import build_info; print(f"{build_info=}"); print("pydantic-core Android wheel OK")'
